@@ -8,30 +8,21 @@ It also covers subagents, retries, tool approvals, permissions, and questions wa
 
 ## Install
 
-You need Linux with systemd and a recent version of OpenCode.
-
-```sh
-git clone https://github.com/seaweeduk/opencode-sleep-inhibit.git
-cd opencode-sleep-inhibit
-bun install
-bun run build
-```
-
-Add the plugin to `~/.config/opencode/opencode.json` using its absolute path:
+You need Linux with systemd and OpenCode 1.18.5 or a newer 1.x release. Add the npm package to your project or global OpenCode configuration:
 
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
   "plugin": [
     [
-      "file:///home/you/dev/opencode-sleep-inhibit/dist/index.js",
+      "opencode-sleep-inhibit",
       { "mode": "sleep" }
     ]
   ]
 }
 ```
 
-Replace `/home/you/dev` with the directory where you cloned the repository, then restart OpenCode.
+OpenCode installs and caches the package automatically. No separate `npm install` is required.
 
 ## Choose a Mode
 
@@ -62,6 +53,15 @@ systemd-inhibit --list
 ```
 
 An `OpenCode` entry should appear while work is active and disappear when it finishes.
+
+## Development
+
+```sh
+bun install --frozen-lockfile
+bun run check
+bun run test
+npm pack --dry-run
+```
 
 ## License
 
