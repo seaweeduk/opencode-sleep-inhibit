@@ -17,8 +17,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
-      id-token: write
-      contents: read
+      contents: write
+      pull-requests: write
+      issues: write
       actions: read
 
     steps:
@@ -41,6 +42,8 @@ jobs:
           install -d -m 700 "$auth_dir"
           printf '%s' "$OPENCODE_AUTH_CONTENT" | jq -e . > "$auth_file"
           chmod 600 "$auth_file"
+          filtered_auth="$(jq -ce 'if .openai then {openai: .openai} else empty end' "$auth_file")"
+          echo "OPENCODE_AUTH_HASH=$(printf '%s' "$filtered_auth" | sha256sum | cut -d' ' -f1)" >> "$GITHUB_ENV"
 
       - name: Run OpenCode
         uses: anomalyco/opencode/github@latest
@@ -73,6 +76,8 @@ jobs:
       - name: Persist rotated OpenCode auth
         if: ${{ always() }}
         shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
 
@@ -88,11 +93,19 @@ jobs:
           }
           echo "::add-mask::$filtered_auth"
 
-          oidc_response="$(curl -fsSL -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=opencode-github-action")"
-          oidc_token="$(jq -r '.value' <<<"$oidc_response")"
-          echo "::add-mask::$oidc_token"
+          current_auth_hash="$(printf '%s' "$filtered_auth" | sha256sum | cut -d' ' -f1)"
+          if [ "$current_auth_hash" = "$OPENCODE_AUTH_HASH" ]; then
+            echo "::notice::OpenCode auth did not change; skipping auth persistence."
+            exit 0
+          fi
 
-          app_response="$(curl -fsSL -X POST -H "Authorization: Bearer $oidc_token" https://api.opencode.ai/exchange_github_app_token)"
+          owner="${GITHUB_REPOSITORY%%/*}"
+          repo="${GITHUB_REPOSITORY#*/}"
+          app_response="$(curl -fsSL -X POST \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data "$(jq -nc --arg owner "$owner" --arg repo "$repo" '{owner: $owner, repo: $repo}')" \
+            https://api.opencode.ai/exchange_github_app_token_with_pat)"
           app_token="$(jq -r '.token' <<<"$app_response")"
           echo "::add-mask::$app_token"
 
