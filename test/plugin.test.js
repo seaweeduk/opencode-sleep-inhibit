@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
 import { chmod, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -83,6 +83,66 @@ describe("opencode-sleep-inhibit", () => {
     expect(await held()).toBe(true)
     await status("child", "idle")
     await waitFor(false)
+  })
+
+  test("keeps the inhibitor during the configured cooldown", async () => {
+    await hooks.dispose()
+    hooks = await plugin({}, { cooldownMinutes: 0.001 })
+    await status("session", "busy")
+    await waitFor(true)
+
+    await status("session", "idle")
+    expect(await held()).toBe(true)
+    await waitFor(false)
+  })
+
+  test("cancels the cooldown when work resumes", async () => {
+    await hooks.dispose()
+    hooks = await plugin({}, { cooldownMinutes: 0.002 })
+    await status("session", "busy")
+    await waitFor(true)
+
+    await status("session", "idle")
+    await Bun.sleep(20)
+    await status("session", "busy")
+    await Bun.sleep(150)
+    expect(await held()).toBe(true)
+
+    await status("session", "idle")
+    await waitFor(false)
+  })
+
+  test("does not restart the cooldown for duplicate idle events", async () => {
+    await hooks.dispose()
+    hooks = await plugin({}, { cooldownMinutes: 60 })
+    await status("session", "busy")
+    await waitFor(true)
+
+    const setTimeoutSpy = spyOn(globalThis, "setTimeout")
+    try {
+      await status("session", "idle")
+      await status("session", "idle")
+      expect(setTimeoutSpy.mock.calls.filter(([, delay]) => delay === 3_600_000)).toHaveLength(1)
+    } finally {
+      setTimeoutSpy.mockRestore()
+    }
+  })
+
+  test("releases the inhibitor on disposal during a cooldown", async () => {
+    await hooks.dispose()
+    hooks = await plugin({}, { cooldownMinutes: 60 })
+    await status("session", "busy")
+    await waitFor(true)
+
+    await status("session", "idle")
+    await hooks.dispose()
+    await waitFor(false)
+  })
+
+  test("rejects an invalid cooldown", async () => {
+    await expect(plugin({}, { cooldownMinutes: -1 })).rejects.toThrow("Invalid cooldownMinutes")
+    await expect(plugin({}, { cooldownMinutes: 35_791 })).resolves.toBeDefined()
+    await expect(plugin({}, { cooldownMinutes: 35_792 })).rejects.toThrow("Invalid cooldownMinutes")
   })
 
   test("keeps the inhibitor while a busy session waits for interaction", async () => {
