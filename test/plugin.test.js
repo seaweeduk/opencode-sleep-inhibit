@@ -85,6 +85,48 @@ describe("opencode-sleep-inhibit", () => {
     await waitFor(false)
   })
 
+  test("keeps the inhibitor during the configured cooldown", async () => {
+    await hooks.dispose()
+    hooks = await plugin({}, { cooldownMinutes: 0.001 })
+    await status("session", "busy")
+    await waitFor(true)
+
+    await status("session", "idle")
+    expect(await held()).toBe(true)
+    await waitFor(false)
+  })
+
+  test("cancels the cooldown when work resumes", async () => {
+    await hooks.dispose()
+    hooks = await plugin({}, { cooldownMinutes: 0.002 })
+    await status("session", "busy")
+    await waitFor(true)
+
+    await status("session", "idle")
+    await Bun.sleep(20)
+    await status("session", "busy")
+    await Bun.sleep(150)
+    expect(await held()).toBe(true)
+
+    await status("session", "idle")
+    await waitFor(false)
+  })
+
+  test("releases the inhibitor on disposal during a cooldown", async () => {
+    await hooks.dispose()
+    hooks = await plugin({}, { cooldownMinutes: 60 })
+    await status("session", "busy")
+    await waitFor(true)
+
+    await status("session", "idle")
+    await hooks.dispose()
+    await waitFor(false)
+  })
+
+  test("rejects an invalid cooldown", async () => {
+    await expect(plugin({}, { cooldownMinutes: -1 })).rejects.toThrow("Invalid cooldownMinutes")
+  })
+
   test("keeps the inhibitor while a busy session waits for interaction", async () => {
     await status("session", "busy")
     await waitFor(true)

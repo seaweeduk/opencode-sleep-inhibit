@@ -16,7 +16,7 @@ You need Linux with systemd and OpenCode 1.18.5 or a newer 1.x release. Add the 
   "plugin": [
     [
       "opencode-sleep-inhibit",
-      { "mode": "sleep" }
+      { "mode": "sleep", "cooldownMinutes": 0 }
     ]
   ]
 }
@@ -43,6 +43,16 @@ OpenCode installs and caches the package automatically. No separate `npm install
 ```
 
 Support for idle inhibition depends on your desktop environment.
+
+## Keep It Awake After Work
+
+By default, the inhibitor is released as soon as all agent work becomes idle. Set `cooldownMinutes` to keep the laptop awake for a follow-up window:
+
+```json
+{ "mode": "sleep", "cooldownMinutes": 60 }
+```
+
+New work during the cooldown cancels the pending release. The cooldown starts again when all work becomes idle. Keep the default value of `0` to release the inhibitor immediately.
 
 ## Check It
 

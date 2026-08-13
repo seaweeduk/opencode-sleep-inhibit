@@ -7,6 +7,8 @@ export type SleepInhibitMode = "sleep" | "sleep-and-idle"
 export type SleepInhibitOptions = {
   /** What to inhibit while OpenCode is working. Defaults to "sleep". */
   mode?: SleepInhibitMode
+  /** Minutes to keep inhibiting sleep after all work becomes idle. Defaults to 0. */
+  cooldownMinutes?: number
 }
 
 type SessionStatusEvent = {
@@ -26,6 +28,7 @@ const SleepInhibitPlugin = (async (_input, rawOptions?: PluginOptions) => {
   const options = parseOptions(rawOptions)
   const activeSessions = new Set<string>()
   let inhibitor: ChildProcessByStdio<Writable, null, null> | undefined
+  let cooldown: ReturnType<typeof setTimeout> | undefined
 
   function startInhibitor() {
     if (inhibitor) return
@@ -59,16 +62,34 @@ const SleepInhibitPlugin = (async (_input, rawOptions?: PluginOptions) => {
   }
 
   function stopInhibitor() {
+    if (cooldown) clearTimeout(cooldown)
+    cooldown = undefined
     const child = inhibitor
     inhibitor = undefined
     child?.stdin.end()
   }
 
+  function stopInhibitorAfterCooldown() {
+    if (!inhibitor) return
+    if (options.cooldownMinutes === 0) {
+      stopInhibitor()
+      return
+    }
+    if (cooldown) clearTimeout(cooldown)
+    cooldown = setTimeout(stopInhibitor, options.cooldownMinutes * 60_000)
+    cooldown.unref()
+  }
+
   function applyEvent(event: SessionStatusEvent) {
     if (event.properties.status.type === "idle") activeSessions.delete(event.properties.sessionID)
     else activeSessions.add(event.properties.sessionID)
-    if (activeSessions.size > 0) startInhibitor()
-    else stopInhibitor()
+    if (activeSessions.size > 0) {
+      if (cooldown) clearTimeout(cooldown)
+      cooldown = undefined
+      startInhibitor()
+    } else {
+      stopInhibitorAfterCooldown()
+    }
   }
 
   return {
@@ -85,10 +106,18 @@ const SleepInhibitPlugin = (async (_input, rawOptions?: PluginOptions) => {
 
 function parseOptions(options?: PluginOptions): Required<SleepInhibitOptions> {
   const mode = options?.mode ?? "sleep"
-  if (mode === "sleep" || mode === "sleep-and-idle") return { mode }
-  throw new Error(
-    `[opencode-sleep-inhibit] Invalid mode ${JSON.stringify(mode)}; expected "sleep" or "sleep-and-idle"`,
-  )
+  if (mode !== "sleep" && mode !== "sleep-and-idle") {
+    throw new Error(
+      `[opencode-sleep-inhibit] Invalid mode ${JSON.stringify(mode)}; expected "sleep" or "sleep-and-idle"`,
+    )
+  }
+  const cooldownMinutes = options?.cooldownMinutes ?? 0
+  if (typeof cooldownMinutes !== "number" || !Number.isFinite(cooldownMinutes) || cooldownMinutes < 0) {
+    throw new Error(
+      `[opencode-sleep-inhibit] Invalid cooldownMinutes ${JSON.stringify(cooldownMinutes)}; expected a non-negative number`,
+    )
+  }
+  return { mode, cooldownMinutes }
 }
 
 export default SleepInhibitPlugin
