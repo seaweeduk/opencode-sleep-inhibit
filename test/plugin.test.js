@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
 import { chmod, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -112,6 +112,22 @@ describe("opencode-sleep-inhibit", () => {
     await waitFor(false)
   })
 
+  test("does not restart the cooldown for duplicate idle events", async () => {
+    await hooks.dispose()
+    hooks = await plugin({}, { cooldownMinutes: 60 })
+    await status("session", "busy")
+    await waitFor(true)
+
+    const setTimeoutSpy = spyOn(globalThis, "setTimeout")
+    try {
+      await status("session", "idle")
+      await status("session", "idle")
+      expect(setTimeoutSpy.mock.calls.filter(([, delay]) => delay === 3_600_000)).toHaveLength(1)
+    } finally {
+      setTimeoutSpy.mockRestore()
+    }
+  })
+
   test("releases the inhibitor on disposal during a cooldown", async () => {
     await hooks.dispose()
     hooks = await plugin({}, { cooldownMinutes: 60 })
@@ -125,6 +141,8 @@ describe("opencode-sleep-inhibit", () => {
 
   test("rejects an invalid cooldown", async () => {
     await expect(plugin({}, { cooldownMinutes: -1 })).rejects.toThrow("Invalid cooldownMinutes")
+    await expect(plugin({}, { cooldownMinutes: 35_791 })).resolves.toBeDefined()
+    await expect(plugin({}, { cooldownMinutes: 35_792 })).rejects.toThrow("Invalid cooldownMinutes")
   })
 
   test("keeps the inhibitor while a busy session waits for interaction", async () => {

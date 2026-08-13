@@ -19,6 +19,9 @@ type SessionStatusEvent = {
   }
 }
 
+const MAX_TIMER_DELAY_MS = 2_147_483_647
+const MAX_COOLDOWN_MINUTES = Math.floor(MAX_TIMER_DELAY_MS / 60_000)
+
 const SleepInhibitPlugin = (async (_input, rawOptions?: PluginOptions) => {
   if (process.platform !== "linux") {
     console.warn("[opencode-sleep-inhibit] This plugin supports Linux only")
@@ -81,13 +84,14 @@ const SleepInhibitPlugin = (async (_input, rawOptions?: PluginOptions) => {
   }
 
   function applyEvent(event: SessionStatusEvent) {
+    const wasActive = activeSessions.size > 0
     if (event.properties.status.type === "idle") activeSessions.delete(event.properties.sessionID)
     else activeSessions.add(event.properties.sessionID)
     if (activeSessions.size > 0) {
       if (cooldown) clearTimeout(cooldown)
       cooldown = undefined
       startInhibitor()
-    } else {
+    } else if (wasActive) {
       stopInhibitorAfterCooldown()
     }
   }
@@ -112,9 +116,14 @@ function parseOptions(options?: PluginOptions): Required<SleepInhibitOptions> {
     )
   }
   const cooldownMinutes = options?.cooldownMinutes ?? 0
-  if (typeof cooldownMinutes !== "number" || !Number.isFinite(cooldownMinutes) || cooldownMinutes < 0) {
+  if (
+    typeof cooldownMinutes !== "number" ||
+    !Number.isFinite(cooldownMinutes) ||
+    cooldownMinutes < 0 ||
+    cooldownMinutes > MAX_COOLDOWN_MINUTES
+  ) {
     throw new Error(
-      `[opencode-sleep-inhibit] Invalid cooldownMinutes ${JSON.stringify(cooldownMinutes)}; expected a non-negative number`,
+      `[opencode-sleep-inhibit] Invalid cooldownMinutes ${JSON.stringify(cooldownMinutes)}; expected a number between 0 and ${MAX_COOLDOWN_MINUTES}`,
     )
   }
   return { mode, cooldownMinutes }
