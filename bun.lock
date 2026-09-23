@@ -5,14 +5,12 @@
     "": {
       "name": "opencode-sleep-inhibit",
       "devDependencies": {
-        "@opencode/client": "2.0.14",
         "@opencode/plugin": "2.0.14",
         "@types/node": "22.15.3",
         "effect": "4.0.0-rc.112",
         "typescript": "5.8.3",
       },
       "peerDependencies": {
-        "@opencode/client": "2.0.14",
         "@opencode/plugin": "2.0.14",
         "effect": "4.0.0-rc.112",
       },
