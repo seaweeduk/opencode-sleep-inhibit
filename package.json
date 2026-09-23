@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "name": "opencode-sleep-inhibit",
-  "version": "0.2.0",
+  "version": "2.0.0",
   "description": "Prevent Linux sleep while OpenCode agents are working.",
   "type": "module",
   "main": "./dist/index.js",
@@ -24,7 +24,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "check": "tsc -p tsconfig.json --noEmit",
-    "test": "bun run build && bun test",
+    "test": "bun test",
+    "test:boundary": "bun test test/options.test.ts test/process.test.ts",
     "prepublishOnly": "bun run check && bun run test",
     "prepack": "bun run build"
   },
@@ -49,7 +50,7 @@
   "author": "seaweeduk",
   "license": "MIT",
   "engines": {
-    "opencode": ">=1.18.5 <2"
+    "opencode": ">=2.0.14 <3"
   },
   "os": [
     "linux"
@@ -58,8 +59,13 @@
     "access": "public",
     "registry": "https://registry.npmjs.org/"
   },
+  "peerDependencies": {
+    "@opencode/plugin": "2.0.14",
+    "effect": "4.0.0-rc.112"
+  },
   "devDependencies": {
-    "@opencode-ai/plugin": "1.18.5",
+    "@opencode/plugin": "2.0.14",
+    "effect": "4.0.0-rc.112",
     "@types/node": "22.15.3",
     "typescript": "5.8.3"
   }
