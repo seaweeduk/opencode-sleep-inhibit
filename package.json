@@ -60,10 +60,12 @@
     "registry": "https://registry.npmjs.org/"
   },
   "peerDependencies": {
+    "@opencode/client": "2.0.14",
     "@opencode/plugin": "2.0.14",
     "effect": "4.0.0-rc.112"
   },
   "devDependencies": {
+    "@opencode/client": "2.0.14",
     "@opencode/plugin": "2.0.14",
     "effect": "4.0.0-rc.112",
     "@types/node": "22.15.3",
