@@ -1,15 +1,22 @@
 import { spawn, type ChildProcessByStdio } from "node:child_process"
-import type { Writable } from "node:stream"
+import type { Readable, Writable } from "node:stream"
 import type { SleepInhibitMode } from "./options.js"
 
-type Launch = (command: string, args: string[]) => ChildProcessByStdio<Writable, null, null>
+type Launch = (command: string, args: string[]) => ChildProcessByStdio<Writable, null, Readable>
 
 /** The injected launch boundary lets tests use a pipe-only child, never systemd. */
 export function openInhibitor(
   mode: SleepInhibitMode,
-  launch: Launch = (command, args) => spawn(command, args, { stdio: ["pipe", "ignore", "ignore"] }),
+  launch: Launch = (command, args) => spawn(command, args, { stdio: ["pipe", "ignore", "pipe"] }),
 ) {
-  const child = launch("systemd-inhibit", [
+  // A remote login may be denied a sleep lock. A user unit has no login session,
+  // so polkit associates it with the user's active graphical session instead.
+  const child = launch("systemd-run", [
+    "--user",
+    "--wait",
+    "--pipe",
+    "--collect",
+    "systemd-inhibit",
     `--what=${mode === "sleep-and-idle" ? "sleep:idle" : "sleep"}`,
     "--mode=block",
     "--who=OpenCode",
@@ -19,10 +26,14 @@ export function openInhibitor(
   ])
   // Resolve errors as values so a child failing before the Effect starts awaiting
   // it cannot create an unhandled Promise rejection.
+  let stderr = ""
+  child.stderr.on("data", (chunk: Buffer) => {
+    stderr = (stderr + chunk.toString()).slice(-4096)
+  })
   const closed = new Promise<Error>((resolve) => {
     child.once("error", resolve)
     child.once("close", (code, signal) =>
-      resolve(new Error(`systemd-inhibit exited with ${signal ? `signal ${signal}` : `code ${code}`}`)),
+      resolve(new Error(`systemd-run exited with ${signal ? `signal ${signal}` : `code ${code}`}${stderr ? `: ${stderr.trim()}` : ""}`)),
     )
     child.stdin.on("error", () => {})
   })
