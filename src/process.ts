@@ -22,7 +22,8 @@ export function openInhibitor(
     "--who=OpenCode",
     "--why=OpenCode has active agent work",
     "--",
-    "/bin/cat",
+    // Not /bin/cat: not every distro has it (e.g. NixOS).
+    "cat",
   ])
   // Resolve errors as values so a child failing before the Effect starts awaiting
   // it cannot create an unhandled Promise rejection.

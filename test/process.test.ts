@@ -18,7 +18,7 @@ for (const mode of ["sleep", "sleep-and-idle"] as const) {
         args: [
           "--user", "--wait", "--pipe", "--collect", "systemd-inhibit",
           `--what=${mode === "sleep" ? "sleep" : "sleep:idle"}`,
-          "--mode=block", "--who=OpenCode", "--why=OpenCode has active agent work", "--", "/bin/cat",
+          "--mode=block", "--who=OpenCode", "--why=OpenCode has active agent work", "--", "cat",
         ],
       }])
       const result = await Promise.race([child.closed, Bun.sleep(30).then(() => "open")])
