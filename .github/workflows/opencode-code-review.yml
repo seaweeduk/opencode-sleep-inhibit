@@ -168,7 +168,7 @@ jobs:
               "provider": {
                 "openai": {
                   "models": {
-                    "gpt-6-astra": {
+                    "gpt-6.2-astra": {
                       "options": {
                         "reasoningEffort": "high"
                       }
@@ -178,7 +178,7 @@ jobs:
               }
             }
         with:
-          model: openai/gpt-6-astra
+          model: openai/gpt-6.2-astra
           use_github_token: true
           variant: high
           share: false
